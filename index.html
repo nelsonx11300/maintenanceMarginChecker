@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maintenance Margin Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Maintenance Margin Calculator</h1>
+        <label for="symbol">Trading Pair Symbol:</label>
+        <input type="text" id="symbol" placeholder="e.g., BTCUSDT">
+
+        <label for="positionSize">Position Size:</label>
+        <input type="number" id="positionSize" placeholder="Enter position size">
+
+        <label for="markPrice">Mark Price:</label>
+        <input type="number" id="markPrice" placeholder="Enter mark price">
+
+        <button onclick="calculateMaintenanceMargin()">Calculate Maintenance Margin</button>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        async function fetchBrackets(symbol) {
+            const response = await fetch(`https://www.binance.com/bapi/futures/v1/friendly/future/common/brackets?symbol=${symbol}`);
+            const data = await response.json();
+            return data.success ? data.data.brackets[0].riskBrackets : null;
+        }
+
+        async function calculateMaintenanceMargin() {
+            const symbol = document.getElementById('symbol').value;
+            const positionSize = parseFloat(document.getElementById('positionSize').value);
+            const markPrice = parseFloat(document.getElementById('markPrice').value);
+
+            if (!symbol || isNaN(positionSize) || isNaN(markPrice)) {
+                alert('Please enter valid inputs.');
+                return;
+            }
+
+            const nominalValue = positionSize * markPrice;
+            const brackets = await fetchBrackets(symbol);
+
+            if (!brackets) {
+                alert('Failed to fetch bracket data or symbol not found.');
+                return;
+            }
+
+            let maintenanceMarginRate = 0;
+            let cumFastMaintenanceAmount = 0;
+            let bracketSeq = 0;
+
+            for (const bracket of brackets) {
+                if (nominalValue > bracket.bracketNotionalFloor && nominalValue <= bracket.bracketNotionalCap) {
+                    maintenanceMarginRate = bracket.bracketMaintenanceMarginRate;
+                    cumFastMaintenanceAmount = bracket.cumFastMaintenanceAmount;
+                    bracketSeq = bracket.bracketSeq;
+                    break;
+                }
+            }
+
+            const maintenanceMargin = nominalValue * maintenanceMarginRate - cumFastMaintenanceAmount;
+
+            document.getElementById('result').innerHTML = `
+                <strong>Calculation Steps:</strong><br>
+                Trading Pair Symbol: ${symbol}<br>
+                Position Size: ${positionSize}<br>
+                Mark Price: ${markPrice}<br>
+                Nominal Value: ${nominalValue.toFixed(2)}<br>
+                Bracket Sequence: ${bracketSeq}<br>
+                Maintenance Margin Rate: ${maintenanceMarginRate}<br>
+                Cumulative Fast Maintenance Amount: ${cumFastMaintenanceAmount}<br>
+                <strong>Maintenance Margin: ${maintenanceMargin.toFixed(2)}</strong>
+            `;
+        }
+    </script>
+
+</body>
+</html>
